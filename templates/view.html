@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Praca inżynierska</title>
+    <script>
+function deleteProduct(id) {
+    if (confirm("Czy na pewno chcesz usunąć ten produkt?")) {
+        fetch(`/delete/${id}`, {
+            method: 'DELETE'
+        }).then(response => response.json())
+          .then(data => {
+              alert(data.message);
+              location.reload();  // Odświeżenie strony po usunięciu
+          })
+          .catch(error => console.error("Błąd:", error));
+    }
+}
+</script>
+</head>
+
+<body>
+
+    <h2>Lista produktów</h2>
+    <table border="1">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Nazwa</th>
+                <th>Opis</th>
+                <th>Akcje</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for id, name, description in products %}
+                <tr>
+                    <td>{{ id }}</td>
+                    <td>{{ name }}</td>
+                    <td>{{ description }}</td>
+                    <td>
+                        <button class="btn btn-sm btn-danger" onclick="deleteProduct({{ id }})">Usuń</button>
+                        <a href="{{ url_for('edit_product', id=id) }}">Edytuj</a>
+                    </td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+
+</body>
+</html>

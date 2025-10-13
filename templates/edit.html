@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <title>Edytuj produkt</title>
+</head>
+<body>
+    <h2>Edytuj produkt</h2>
+    <form method="POST">
+        <label for="name">Nazwa:</label>
+        <input type="text" id="name" name="name" value="{{ name }}" required><br><br>
+
+        <label for="description">Opis:</label>
+        <textarea id="description" name="description" required>{{ description }}</textarea><br><br>
+
+        <button type="submit">Zapisz zmiany</button>
+    </form>
+    <br>
+    <a href="/view.html">Powrót do listy produktów</a>
+</body>
+</html>
