@@ -2,51 +2,43 @@
 <html lang="pl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Praca inżynierska</title>
+    <title>Lista produktów</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <script>
-function deleteProduct(id) {
-    if (confirm("Czy na pewno chcesz usunąć ten produkt?")) {
-        fetch(`/delete/${id}`, {
-            method: 'DELETE'
-        }).then(response => response.json())
-          .then(data => {
-              alert(data.message);
-              location.reload();  // Odświeżenie strony po usunięciu
-          })
-          .catch(error => console.error("Błąd:", error));
-    }
-}
-</script>
+        async function deleteProduct(id) {
+            if (!confirm("Czy na pewno chcesz usunąć produkt?")) return;
+            const response = await fetch(`/delete/${id}`, { method: 'DELETE' });
+            if (response.ok) location.reload();
+            else alert("Błąd przy usuwaniu produktu.");
+        }
+    </script>
 </head>
-
-<body>
-
-    <h2>Lista produktów</h2>
-    <table border="1">
-        <thead>
-            <tr>
-                <th>ID</th>
-                <th>Nazwa</th>
-                <th>Opis</th>
-                <th>Akcje</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for id, name, description in products %}
+<body class="p-4">
+    <div class="container">
+        <h2>Produkty</h2>
+        <a href="/add.html" class="btn btn-primary mb-3">Dodaj nowy produkt</a>
+        <table class="table table-bordered">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Nazwa</th>
+                    <th>Streszczenie</th>
+                    <th>Link</th>
+                    <th>Akcje</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for id, name, description, link in products %}
                 <tr>
                     <td>{{ id }}</td>
                     <td>{{ name }}</td>
                     <td>{{ description }}</td>
+                    <td><a href="{{ link }}" target="_blank">{{ link }}</a></td>
                     <td>
-                        <button class="btn btn-sm btn-danger" onclick="deleteProduct({{ id }})">Usuń</button>
-                        <a href="{{ url_for('edit_product', id=id) }}">Edytuj</a>
+                        <a href="/edit/{{ id }}" class="btn btn-sm btn-warning">Edytuj</a>
+                        <button onclick="deleteProduct({{ id }})" class="btn btn-sm btn-danger">Usuń</button>
                     </td>
                 </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-
-
-</body>
-</html>
+                {% endfor %}
+            </tbody>
+        </t
