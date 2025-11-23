@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <title>Logi systemowe</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f7f7f7;
+            padding: 20px;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 25px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            box-shadow: 0 0 8px rgba(0,0,0,0.1);
+        }
+
+        th, td {
+            padding: 12px;
+            border-bottom: 1px solid #ddd;
+        }
+
+        th {
+            background: #333;
+            color: white;
+            cursor: pointer;
+        }
+
+        tr:hover {
+            background: #f1f1f1;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        #search {
+            width: 300px;
+            padding: 10px;
+            font-size: 16px;
+            margin-bottom: 15px;
+        }
+    </style>
+
+    <script>
+        // Sortowanie kolumn
+        function sortTable(col) {
+            let table = document.getElementById("logTable");
+            let rows = Array.from(table.rows).slice(1);
+            let asc = table.getAttribute("data-sort") !== "asc";
+
+            rows.sort((a, b) => {
+                let A = a.cells[col].innerText.trim();
+                let B = b.cells[col].innerText.trim();
+                return asc ? A.localeCompare(B) : B.localeCompare(A);
+            });
+
+            rows.forEach(r => table.appendChild(r));
+            table.setAttribute("data-sort", asc ? "asc" : "desc");
+        }
+
+        // Wyszukiwarka logów
+        function filterLogs() {
+            let filter = document.getElementById("search").value.toLowerCase();
+            let rows = document.querySelectorAll("#logTable tr");
+
+            rows.forEach((row, idx) => {
+                if (idx === 0) return;
+                let text = row.innerText.toLowerCase();
+                row.style.display = text.includes(filter) ? "" : "none";
+            });
+        }
+    </script>
+</head>
+<body>
+<div class="container">
+
+    <h1>Panel logów systemowych</h1>
+
+    <input id="search" type="text" placeholder="Szukaj w logach..." onkeyup="filterLogs()">
+
+    <table id="logTable" data-sort="asc">
+        <tr>
+            <th onclick="sortTable(0)">ID</th>
+            <th onclick="sortTable(1)">Akcja</th>
+            <th onclick="sortTable(2)">Szczegóły</th>
+            <th onclick="sortTable(3)">Data</th>
+        </tr>
+
+        {% for log in logs %}
+        <tr>
+            <td>{{ log[0] }}</td>
+            <td>{{ log[1] }}</td>
+            <td>{{ log[2] }}</td>
+            <td>{{ log[3] }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+
+</div>
+</body>
+</html>

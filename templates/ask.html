@@ -2,50 +2,117 @@
 <html lang="pl">
 <head>
     <meta charset="UTF-8">
-    <title>Zadaj pytanie</title>
+    <title>Asystent produktowy</title>
+
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    <script>
-        async function askQuestion(event) {
-            event.preventDefault();
-            const question = document.getElementById("question").value;
-            if (!question.trim()) return;
 
-            const responseBox = document.getElementById("response");
-            responseBox.textContent = "Ładowanie...";
+    <style>
+        body { background: #f5f5f5; }
+        .chat-box { background: white; border-radius: 10px; padding: 20px; height: 70vh; overflow-y: auto; border: 1px solid #ddd; }
+        .msg-user { text-align: right; margin: 10px 0; }
+        .msg-user .bubble { display: inline-block; background: #007bff; color: white; padding: 10px 15px; border-radius: 12px; max-width: 75%; }
+        .msg-ai { text-align: left; margin: 10px 0; }
+        .msg-ai .bubble { display: inline-block; background: #e9ecef; padding: 10px 15px; border-radius: 12px; max-width: 75%; }
+        .product-card { display: inline-block; width: 180px; border: 1px solid #ddd; border-radius: 10px; padding: 10px; margin: 5px; background: white; cursor: pointer; transition: 0.2s; }
+        .product-card:hover { transform: scale(1.03); border-color: #007bff; }
+        .product-img { width: 100%; height: 120px; object-fit: contain; }
+    </style>
 
-            try {
-                const res = await fetch('/ask', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ question })
-                });
-                const data = await res.json();
-                if (res.ok) {
-                    responseBox.textContent = data.answer;
-                } else {
-                    responseBox.textContent = "Błąd: " + (data.error || "Nieznany błąd");
-                }
-            } catch (err) {
-                responseBox.textContent = "Błąd sieci: " + err;
-            }
-        }
-    </script>
 </head>
-<body class="p-4">
-    <div class="container">
-        <h2>Zadaj pytanie o produkty</h2>
-        <form onsubmit="askQuestion(event)">
-            <div class="mb-3">
-                <label class="form-label">Twoje pytanie</label>
-                <input type="text" id="question" class="form-control" required>
-            </div>
-            <button type="submit" class="btn btn-success">Zapytaj</button>
-            <a href="/" class="btn btn-secondary">Strona główna</a>
-        </form>
-        <div class="mt-4">
-            <h4>Odpowiedź:</h4>
-            <pre id="response" style="white-space: pre-wrap;"></pre>
-        </div>
+<body>
+<div class="container py-4">
+
+    <div class="d-flex justify-content-between">
+        <h2>Asystent produktowy</h2>
+        <button class="btn btn-danger" onclick="newChat()">Nowa rozmowa</button>
     </div>
+
+    <div id="chat" class="chat-box mt-3"></div>
+
+    <form class="mt-3" onsubmit="sendMessage(event)">
+        <div class="input-group">
+            <input type="text" id="question" class="form-control" placeholder="Napisz wiadomość..." required>
+            <button class="btn btn-success">Wyślij</button>
+        </div>
+    </form>
+
+</div>
+
+<script>
+    let history = [];
+
+    function addMessage(sender, text) {
+        const chat = document.getElementById("chat");
+        const div = document.createElement("div");
+        div.className = sender === "user" ? "msg-user" : "msg-ai";
+
+        const bubble = document.createElement("div");
+        bubble.className = "bubble";
+        bubble.innerText = text;
+
+        div.appendChild(bubble);
+        chat.appendChild(div);
+        chat.scrollTop = chat.scrollHeight;
+    }
+
+    function addProducts(products) {
+        const chat = document.getElementById("chat");
+
+        products.forEach(p => {
+            const card = document.createElement("div");
+            card.className = "product-card";
+            card.onclick = () => window.location.href = `/product/${p.id}`;
+
+            const img = document.createElement("img");
+            img.src = p.image_url || "/static/no_image.png";
+            img.className = "product-img";
+
+            const name = document.createElement("div");
+            name.innerText = p.name;
+            name.className = "fw-bold mt-2";
+
+            card.appendChild(img);
+            card.appendChild(name);
+
+            chat.appendChild(card);
+        });
+
+        chat.scrollTop = chat.scrollHeight;
+    }
+
+    async function sendMessage(event) {
+        event.preventDefault();
+        const question = document.getElementById("question").value.trim();
+        if (!question) return;
+
+        addMessage("user", question);
+        history.push({ role: "user", content: question });
+        document.getElementById("question").value = "";
+        addMessage("ai", "⏳ Myślę...");
+
+        const res = await fetch("/ask", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ question, history })
+        });
+
+        const data = await res.json();
+        document.querySelector(".msg-ai:last-child").remove();
+
+        addMessage("ai", data.answer);
+        history.push({ role: "assistant", content: data.answer });
+
+        if (data.products && data.products.length > 0) {
+            addProducts(data.products);
+        }
+    }
+
+    function newChat() {
+        history = [];
+        document.getElementById("chat").innerHTML = "";
+        fetch("/new_chat"); // reset session w backendzie
+    }
+</script>
+
 </body>
 </html>
