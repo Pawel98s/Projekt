@@ -167,6 +167,88 @@ def product_page(product_id):
     return render_template('product.html', name=name, description=description, link=link)
 
 
+@app.route('/delete/<int:id>', methods=['DELETE'])
+def delete_product(id):
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+
+    cur.execute("SELECT name FROM products WHERE id = %s", (id,))
+    row = cur.fetchone()
+
+    if not row:
+        cur.close()
+        conn.close()
+        log_event("DELETE_PRODUCT_FAIL", f"Tried to delete missing product ID {id}")
+        return jsonify({"error": "Produkt nie istnieje"}), 404
+
+    product_name = row[0]
+
+    cur.execute("DELETE FROM products WHERE id = %s", (id,))
+    conn.commit()
+
+    cur.close()
+    conn.close()
+
+    log_event("DELETE_PRODUCT", f"Deleted product '{product_name}' (ID {id})")
+
+    return jsonify({"message": "Produkt usunięty!"}), 200
+
+@app.route('/edit/<int:id>', methods=['GET', 'POST'])
+def edit_product(id):
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+
+    cur.execute("SELECT name, link FROM products WHERE id = %s", (id,))
+    product = cur.fetchone()
+
+    if not product:
+        cur.close()
+        conn.close()
+
+        log_event("EDIT_PRODUCT_FAIL", f"Tried to edit missing product ID {id}")
+
+        return "Produkt nie istnieje", 404
+
+    old_name, old_link = product
+
+    if request.method == 'POST':
+        new_name = request.form.get('name')
+        new_link = request.form.get('link')
+
+        new_description = generate_summary_from_link(new_link)
+
+        new_embedding = model.encode(new_description).tolist()
+
+        cur.execute("""
+            UPDATE products
+            SET name = %s,
+                link = %s,
+                description = %s,
+                embedding = %s
+            WHERE id = %s
+        """, (new_name, new_link, new_description, new_embedding, id))
+
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        log_event(
+            "EDIT_PRODUCT",
+            f"Edited product ID {id}. Old name: '{old_name}', New name: '{new_name}', Old link: '{old_link}', New link: '{new_link}'"
+        )
+
+        return redirect('/view.html')
+
+    cur.close()
+    conn.close()
+
+    return render_template('edit.html', id=id, name=old_name, link=old_link)
+
+
+
+
 @app.route('/ask.html')
 def ask_page():
     return render_template('ask.html')
@@ -221,7 +303,7 @@ Zasady odpowiedzi:
 
     try:
         response = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-5.1",
             messages=messages,
             temperature=0.3,
         )
