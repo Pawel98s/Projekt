@@ -9,7 +9,7 @@ import requests
 import uuid
 
 app = Flask(__name__)
-app.secret_key = "super_secret_key"
+app.secret_key = "cookie"
 
 
 model = SentenceTransformer('all-MiniLM-L6-v2')
@@ -263,28 +263,39 @@ def ask():
     data = request.json
     question = data.get("question")
     if not question:
-        return jsonify({"error": "Brak pytania"}), 400
+        return jsonify({"answer": "", "products": [], "error": "Brak pytania"}), 400
 
     history = session.get("history", [])
 
 
+    history.append({"role": "user", "content": question})
+    session["history"] = history
+    session.modified = True
+
     query_embedding = model.encode(question).tolist()
-    conn = get_db_connection()
-    cur = conn.cursor()
-    cur.execute("""
-        SELECT id, name, description, link
-        FROM products
-        ORDER BY embedding <#> %s::vector
-        LIMIT 5
-    """, (query_embedding,))
-    rows = cur.fetchall()
-    cur.close()
-    conn.close()
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT p.id, p.name, p.description, p.link,
+       COALESCE(string_agg(r.review_text, '\n'), '') as reviews
+FROM products p
+LEFT JOIN reviews r ON r.product_id = p.id
+GROUP BY p.id, p.name, p.description, p.link
+ORDER BY p.embedding <#> %s::vector
+LIMIT 5
 
-    context = "\n\n".join([f"{name}: {desc[:600]}" for id, name, desc, link in rows])
+        """, (query_embedding,))
+        rows = cur.fetchall()
+        cur.close()
+        conn.close()
 
+        context = "\n\n".join([
+            f"{name}: {desc[:600]}\nOpinie użytkowników: {reviews or 'Brak opinii'}"
+            for id, name, desc, link, reviews in rows
+        ])
 
-    prompt = f"""
+        prompt = f"""
 Użytkownik pyta: {question}
 
 Oto produkty z bazy, które mogą pasować (używaj tylko tych!):
@@ -292,16 +303,16 @@ Oto produkty z bazy, które mogą pasować (używaj tylko tych!):
 
 Zasady odpowiedzi:
 - opisuj wyłącznie produkty z listy powyżej
+- uwzględniaj opinie użytkowników w rekomendacjach
 - nie wymyślaj nowych produktów
 - jeśli żaden produkt nie pasuje, napisz to
 - odpowiedź krótka i konkretna
 """
 
-    messages = [{"role": "system", "content": "Jesteś inteligentnym asystentem produktowym. Odpowiadasz po polsku."}]
-    messages.extend(history)
-    messages.append({"role": "user", "content": prompt})
+        messages = [{"role": "system", "content": "Jesteś inteligentnym asystentem produktowym. Odpowiadasz po polsku."}]
+        messages.extend(history)
+        messages.append({"role": "user", "content": prompt})
 
-    try:
         response = client.chat.completions.create(
             model="gpt-5.1",
             messages=messages,
@@ -310,14 +321,12 @@ Zasady odpowiedzi:
         answer = response.choices[0].message.content.strip()
 
 
-        session["history"].append({"role": "user", "content": question})
         session["history"].append({"role": "assistant", "content": answer})
         session.modified = True
 
-
         products_info = []
         answer_lower = answer.lower()
-        for pid, name, desc, link in rows:
+        for pid, name, desc, link, reviews in rows:
             if any(word.lower() in answer_lower for word in name.split()):
                 products_info.append({
                     "id": pid,
@@ -329,10 +338,12 @@ Zasady odpowiedzi:
 
         log_event("ASK_QUERY", f"Question: '{question}', AI answer: '{answer}'")
 
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"answer": answer, "products": products_info})
 
-    return jsonify({"answer": answer, "products": products_info})
+    except Exception as e:
+        # Nawet przy błędzie zwracamy zawsze te same klucze
+        return jsonify({"answer": f"Błąd: {str(e)}", "products": []})
+
 
 @app.route('/new_chat')
 def new_chat():
@@ -342,7 +353,7 @@ def new_chat():
 
 
 
-@app.route('/logs.html')
+@app.route('/logs')
 def view_logs():
     conn = get_db_connection()
     cur = conn.cursor()
@@ -351,6 +362,33 @@ def view_logs():
     cur.close()
     conn.close()
     return render_template('logs.html', logs=logs)
+
+@app.route('/addReview', methods=['GET', 'POST'])
+def add_review():
+    conn = get_db_connection()
+    cur = conn.cursor()
+    if request.method == 'POST':
+        product_id = request.form.get('product_id')
+        review_text = request.form.get('review_text')
+
+        cur.execute("INSERT INTO reviews (product_id, review_text) VALUES (%s, %s)",
+                    (product_id, review_text))
+        conn.commit()
+
+        cur.close()
+        conn.close()
+
+        log_event("ADD_REVIEW", f"Review for product_id {product_id}: {review_text}")
+
+        return redirect('/addReview')
+
+    # GET → lista produktów w select
+    cur.execute("SELECT id, name FROM products")
+    products = cur.fetchall()
+    cur.close()
+    conn.close()
+    return render_template('addReview.html', products=products)
+
 
 
 

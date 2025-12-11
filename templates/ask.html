@@ -86,24 +86,32 @@
         if (!question) return;
 
         addMessage("user", question);
-        history.push({ role: "user", content: question });
         document.getElementById("question").value = "";
         addMessage("ai", "⏳ Myślę...");
 
-        const res = await fetch("/ask", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ question, history })
-        });
+        try {
+            const res = await fetch("/ask", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ question })
+            });
 
-        const data = await res.json();
-        document.querySelector(".msg-ai:last-child").remove();
+            const data = await res.json();
+            document.querySelector(".msg-ai:last-child").remove();
 
-        addMessage("ai", data.answer);
-        history.push({ role: "assistant", content: data.answer });
+            if (data.answer) {
+                addMessage("ai", data.answer);
+            } else {
+                addMessage("ai", "Brak odpowiedzi od AI.");
+            }
 
-        if (data.products && data.products.length > 0) {
-            addProducts(data.products);
+            if (data.products && data.products.length > 0) {
+                addProducts(data.products);
+            }
+        } catch (err) {
+            document.querySelector(".msg-ai:last-child").remove();
+            addMessage("ai", "Błąd połączenia z serwerem.");
+            console.error(err);
         }
     }
 
@@ -112,6 +120,17 @@
         document.getElementById("chat").innerHTML = "";
         fetch("/new_chat"); // reset session w backendzie
     }
+
+    document.addEventListener("DOMContentLoaded", async () => {
+        const res = await fetch("/get_history");
+        const hist = await res.json();
+
+        history = hist;
+
+        hist.forEach(msg => {
+            addMessage(msg.role === "user" ? "user" : "ai", msg.content);
+        });
+    });
 </script>
 
 </body>
