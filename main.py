@@ -382,7 +382,7 @@ def add_review():
 
         return redirect('/addReview')
 
-    # GET → lista produktów w select
+
     cur.execute("SELECT id, name FROM products")
     products = cur.fetchall()
     cur.close()
@@ -390,6 +390,24 @@ def add_review():
     return render_template('addReview.html', products=products)
 
 
+@app.route('/reviews')
+def view_reviews():
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+
+    cur.execute("""
+        SELECT r.id, r.review_text, p.name, p.id
+        FROM reviews r
+        JOIN products p ON r.product_id = p.id
+        ORDER BY r.id DESC
+    """)
+    reviews = cur.fetchall()
+
+    cur.close()
+    conn.close()
+
+    return render_template('reviews.html', reviews=reviews)
 
 
 if __name__ == '__main__':
