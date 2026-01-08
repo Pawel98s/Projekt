@@ -147,7 +147,14 @@ def add_product():
 def view_products():
     conn = get_db_connection()
     cur = conn.cursor()
-    cur.execute("SELECT id, name, description, link FROM products")
+    cur.execute("""
+        SELECT p.id, p.name, p.description, p.link,
+               COALESCE(string_agg(r.review_text, '\n'), '') as reviews
+        FROM products p
+        LEFT JOIN reviews r ON r.product_id = p.id
+        GROUP BY p.id, p.name, p.description, p.link
+        ORDER BY p.id
+    """)
     products = cur.fetchall()
     cur.close()
     conn.close()
