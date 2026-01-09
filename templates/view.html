@@ -17,7 +17,6 @@
 
     <style>
         .summary-cell .md {
-            /* Możesz dodać styl do Markdown w streszczeniu */
             font-size: 0.95rem;
         }
 
@@ -34,6 +33,27 @@
             margin-bottom: 0;
         }
     </style>
+    <script>
+async function deleteReview(id) {
+    if (!confirm("Usunąć opinię?")) return;
+    const res = await fetch(`/delete_review/${id}`, { method: "DELETE" });
+    if (res.ok) location.reload();
+}
+
+async function editReview(id) {
+    const text = prompt("Edytuj opinię:");
+    if (!text) return;
+
+    await fetch(`/edit_review/${id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ review_text: text })
+    });
+
+    location.reload();
+}
+</script>
+
 </head>
 <body class="p-4">
     <div class="container">
@@ -51,46 +71,55 @@
                 </tr>
             </thead>
             <tbody>
-                {% for id, name, description, link, reviews in products %}
-                <tr>
-                    <td>{{ id }}</td>
-                    <td><strong>{{ name }}</strong></td>
-                    <td class="summary-cell">
-                        <div class="md">{{ description }}</div>
-                    </td>
-                    <td>
-                        {% if link %}
-                            <a href="{{ link }}" target="_blank">Strona producenta</a>
-                        {% else %}
-                            —
-                        {% endif %}
-                    </td>
-                    <td>
-                        <a href="/edit/{{ id }}" class="btn btn-sm btn-warning mb-1 w-100">✏ Edytuj</a>
-                        <button onclick="deleteProduct({{ id }})" class="btn btn-sm btn-danger w-100">🗑 Usuń</button>
-                    </td>
-                </tr>
-                {% if reviews %}
-                <tr>
-                    <td colspan="5">
-                        <div class="review-card">
-                            <strong>Opinie użytkowników:</strong>
-                            <ul>
-                                {% for review in reviews.split('\n') %}
-                                <li>{{ review }}</li>
-                                {% endfor %}
-                            </ul>
-                        </div>
-                    </td>
-                </tr>
-                {% endif %}
+{% for id, name, description, link, reviews in products %}
+<tr>
+    <td>{{ id }}</td>
+    <td><strong>{{ name }}</strong></td>
+    <td class="summary-cell">
+        <div class="md">{{ description }}</div>
+    </td>
+    <td>
+        {% if link %}
+            <a href="{{ link }}" target="_blank">Strona producenta</a>
+        {% else %}
+            —
+        {% endif %}
+    </td>
+    <td>
+        <a href="/edit/{{ id }}" class="btn btn-sm btn-warning mb-1 w-100">✏ Edytuj</a>
+        <button onclick="deleteProduct({{ id }})"
+                class="btn btn-sm btn-danger w-100">🗑 Usuń</button>
+    </td>
+</tr>
+
+{% if reviews %}
+<tr>
+    <td colspan="5">
+        <div class="review-card">
+            <strong>Opinie użytkowników:</strong>
+            <ul>
+                {% for r in reviews %}
+                <li>
+                    {{ r.text }}
+                    <button onclick="editReview({{ r.id }})"
+                            class="btn btn-sm btn-warning ms-2">✏</button>
+                    <button onclick="deleteReview({{ r.id }})"
+                            class="btn btn-sm btn-danger">🗑</button>
+                </li>
                 {% endfor %}
-            </tbody>
+            </ul>
+        </div>
+    </td>
+</tr>
+{% endif %}
+
+{% endfor %}
+</tbody>
+
         </table>
     </div>
 
     <script>
-        // Render Markdown w streszczeniach
         document.querySelectorAll(".md").forEach(el => {
             el.innerHTML = marked.parse(el.innerText);
         });

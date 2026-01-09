@@ -149,16 +149,67 @@ def view_products():
     cur = conn.cursor()
     cur.execute("""
         SELECT p.id, p.name, p.description, p.link,
-               COALESCE(string_agg(r.review_text, '\n'), '') as reviews
-        FROM products p
-        LEFT JOIN reviews r ON r.product_id = p.id
-        GROUP BY p.id, p.name, p.description, p.link
-        ORDER BY p.id
+       json_agg(
+           json_build_object(
+               'id', r.id,
+               'text', r.review_text
+           )
+       ) FILTER (WHERE r.id IS NOT NULL) AS reviews
+FROM products p
+LEFT JOIN reviews r ON r.product_id = p.id
+GROUP BY p.id
+ORDER BY p.id
+
     """)
     products = cur.fetchall()
     cur.close()
     conn.close()
     return render_template('view.html', products=products)
+
+@app.route('/delete_review/<int:id>', methods=['DELETE'])
+def delete_review(id):
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    cur.execute("SELECT review_text FROM reviews WHERE id=%s", (id,))
+    row = cur.fetchone()
+
+    if not row:
+        cur.close()
+        conn.close()
+        return jsonify({"error": "Opinia nie istnieje"}), 404
+
+    cur.execute("DELETE FROM reviews WHERE id=%s", (id,))
+    conn.commit()
+
+    cur.close()
+    conn.close()
+
+    log_event("DELETE_REVIEW", f"Deleted review ID {id}")
+    return jsonify({"status": "ok"})
+
+
+@app.route('/edit_review/<int:id>', methods=['POST'])
+def edit_review(id):
+    data = request.json
+    new_text = data.get("review_text")
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+        UPDATE reviews
+        SET review_text = %s
+        WHERE id = %s
+    """, (new_text, id))
+
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    log_event("EDIT_REVIEW", f"Edited review ID {id}")
+    return jsonify({"status": "ok"})
+
 
 @app.route('/product/<int:product_id>')
 def product_page(product_id):
