@@ -421,24 +421,27 @@ def view_logs():
     conn.close()
     return render_template('logs.html', logs=logs)
 
-@app.route('/addReview', methods=['GET', 'POST'])
+@app.route('/addReview', methods=['POST'])
 def add_review():
+    data = request.get_json()
+    product_id = data.get('product_id')
+    review_text = data.get('review_text')
+
     conn = get_db_connection()
     cur = conn.cursor()
-    if request.method == 'POST':
-        product_id = request.form.get('product_id')
-        review_text = request.form.get('review_text')
+    cur.execute(
+        "INSERT INTO reviews (product_id, review_text) VALUES (%s, %s) RETURNING id",
+        (product_id, review_text)
+    )
+    review_id = cur.fetchone()[0]
+    conn.commit()
+    cur.close()
+    conn.close()
 
-        cur.execute("INSERT INTO reviews (product_id, review_text) VALUES (%s, %s)",
-                    (product_id, review_text))
-        conn.commit()
+    log_event("ADD_REVIEW", f"Review for product_id {product_id}: {review_text}")
 
-        cur.close()
-        conn.close()
 
-        log_event("ADD_REVIEW", f"Review for product_id {product_id}: {review_text}")
-
-        return redirect('/addReview')
+    return jsonify({'id': review_id, 'text': review_text})
 
 
     cur.execute("SELECT id, name FROM products")
