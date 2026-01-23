@@ -157,8 +157,7 @@ def add_product():
 def view_products():
     page = request.args.get("page", 1, type=int)
     q = request.args.get("q", "", type=str)
-
-    per_page = 5
+    per_page = request.args.get("per_page", 5, type=int)  # <- tu pobieramy ilość produktów
     offset = (page - 1) * per_page
 
     conn = get_db_connection()
@@ -171,12 +170,7 @@ def view_products():
         where_clause = "WHERE p.name ILIKE %s OR p.description ILIKE %s"
         params.extend([f"%{q}%", f"%{q}%"])
 
-    cur.execute(f"""
-        SELECT COUNT(*)
-        FROM products p
-        {where_clause}
-    """, params)
-
+    cur.execute(f"SELECT COUNT(*) FROM products p {where_clause}", params)
     total_products = cur.fetchone()[0]
     total_pages = max(1, math.ceil(total_products / per_page))
 
@@ -205,9 +199,67 @@ def view_products():
         products=products,
         page=page,
         total_pages=total_pages,
-        q=q
+        q=q,
+        per_page=per_page
     )
 
+@app.route('/delete_review/<int:id>', methods=['DELETE'])
+def delete_review(id):
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    cur.execute("SELECT review_text FROM reviews WHERE id=%s", (id,))
+    row = cur.fetchone()
+
+    if not row:
+        cur.close()
+        conn.close()
+        return jsonify({"error": "Opinia nie istnieje"}), 404
+
+    cur.execute("DELETE FROM reviews WHERE id=%s", (id,))
+    conn.commit()
+
+    cur.close()
+    conn.close()
+
+    log_event("DELETE_REVIEW", f"Deleted review ID {id}")
+    return jsonify({"status": "ok"})
+
+
+@app.route('/edit_review/<int:id>', methods=['POST'])
+def edit_review(id):
+    data = request.json
+    new_text = data.get("review_text")
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+        UPDATE reviews
+        SET review_text = %s
+        WHERE id = %s
+    """, (new_text, id))
+
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    log_event("EDIT_REVIEW", f"Edited review ID {id}")
+    return jsonify({"status": "ok"})
+
+
+@app.route('/product/<int:product_id>')
+def product_page(product_id):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT name, description, link FROM products WHERE id=%s", (product_id,))
+    row = cur.fetchone()
+    cur.close()
+    conn.close()
+    if not row:
+        return "Produkt nie znaleziony", 404
+    name, description, link = row
+    return render_template('product.html', name=name, description=description, link=link)
 
 @app.route('/delete/<int:id>', methods=['DELETE'])
 def delete_product(id):

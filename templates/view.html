@@ -6,6 +6,7 @@
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
     <style>
         body { background: #f5f5f5; }
@@ -63,15 +64,21 @@
     <div class="d-flex justify-content-between align-items-center mb-3">
         <a href="/add.html" class="btn btn-primary">➕ Dodaj nowy produkt</a>
 
-        <!-- 🔍 WYSZUKIWARKA -->
-        <form class="d-flex" method="get" action="/view.html">
+        <!-- 🔍 WYSZUKIWARKA + SELECT ilości na stronę -->
+        <form id="searchForm" class="d-flex" method="get" action="/view.html">
             <input type="text"
                    class="form-control me-2"
                    name="q"
                    placeholder="Szukaj produktu..."
                    value="{{ q }}">
+
+            <select name="per_page" id="perPageSelect" class="form-select me-2" style="width: auto;">
+                {% for n in [5,10,20,50] %}
+                    <option value="{{ n }}" {% if n==per_page %}selected{% endif %}>{{ n }}</option>
+                {% endfor %}
+            </select>
+
             <input type="hidden" name="page" value="1">
-            <button class="btn btn-outline-secondary">Szukaj</button>
         </form>
     </div>
 
@@ -80,7 +87,7 @@
         <tr>
             <th>ID</th>
             <th>Nazwa</th>
-            <th>Streszczenie</th>
+            <th>Opis produktu</th>
             <th>Link</th>
             <th>Akcje</th>
         </tr>
@@ -93,7 +100,27 @@
             <td>{{ id }}</td>
             <td><strong>{{ name }}</strong></td>
             <td class="summary-cell">
-                <div class="md">{{ description }}</div>
+                {% set sections = description.split('## ') %}
+                {% for sec in sections %}
+                    {% if sec.strip() %}
+                        {% set lines = sec.split('\n', 1) %}
+                        {% set title = lines[0] %}
+                        {% set content = lines[1] if lines|length > 1 else '' %}
+
+                        <div class="mb-2">
+                            <button class="btn btn-sm btn-outline-primary w-100 text-start"
+                                    type="button"
+                                    data-bs-toggle="collapse"
+                                    data-bs-target="#desc-{{ id }}-{{ loop.index }}"
+                                    aria-expanded="false">
+                                {{ title }}
+                            </button>
+                            <div class="collapse mt-1" id="desc-{{ id }}-{{ loop.index }}">
+                                <div class="card card-body p-2 md">{{ content }}</div>
+                            </div>
+                        </div>
+                    {% endif %}
+                {% endfor %}
             </td>
             <td>
                 {% if link %}
@@ -103,7 +130,7 @@
                 {% endif %}
             </td>
             <td>
-                <a href="/edit/{{ id }}?page={{ page }}&q={{ q }}"
+                <a href="/edit/{{ id }}?page={{ page }}&q={{ q }}&per_page={{ per_page }}"
                    class="btn btn-sm btn-warning mb-1 w-100">✏ Edytuj</a>
 
                 <button onclick="deleteProduct({{ id }})"
@@ -136,9 +163,7 @@
                     <div class="add-review-box">
                         <form class="add-review-form" data-product-id="{{ id }}">
                             <label class="form-label fw-bold">➕ Dodaj opinię</label>
-                            <textarea class="form-control mb-2"
-                                      rows="2"
-                                      required></textarea>
+                            <textarea class="form-control mb-2" rows="2" required></textarea>
                             <button class="btn btn-sm btn-success">💬 Dodaj opinię</button>
                         </form>
                     </div>
@@ -156,21 +181,21 @@
             {% if page > 1 %}
                 <li class="page-item">
                     <a class="page-link"
-                       href="/view.html?page={{ page-1 }}&q={{ q }}">«</a>
+                       href="/view.html?page={{ page-1 }}&q={{ q }}&per_page={{ per_page }}">«</a>
                 </li>
             {% endif %}
 
             {% for p in range(1, total_pages + 1) %}
                 <li class="page-item {% if p == page %}active{% endif %}">
                     <a class="page-link"
-                       href="/view.html?page={{ p }}&q={{ q }}">{{ p }}</a>
+                       href="/view.html?page={{ p }}&q={{ q }}&per_page={{ per_page }}">{{ p }}</a>
                 </li>
             {% endfor %}
 
             {% if page < total_pages %}
                 <li class="page-item">
                     <a class="page-link"
-                       href="/view.html?page={{ page+1 }}&q={{ q }}">»</a>
+                       href="/view.html?page={{ page+1 }}&q={{ q }}&per_page={{ per_page }}">»</a>
                 </li>
             {% endif %}
         </ul>
@@ -183,16 +208,58 @@ async function deleteProduct(id) {
     if (!confirm("Czy na pewno chcesz usunąć produkt?")) return;
     const params = new URLSearchParams(window.location.search);
     const res = await fetch(`/delete/${id}?${params}`, { method: 'DELETE' });
-    if (res.ok) {
-        const data = await res.json();
-        window.location.href = data.redirect;
-    }
+    if (res.ok) location.reload();
 }
 
 async function deleteReview(id) {
     if (!confirm("Usunąć opinię?")) return;
     const res = await fetch(`/delete_review/${id}`, { method: "DELETE" });
     if (res.ok) location.reload();
+}
+
+function startEditReview(button, reviewId) {
+    const reviewItem = button.closest('.review-item');
+    const textDiv = reviewItem.querySelector('.review-text');
+
+    if (reviewItem.classList.contains('editing')) return;
+    reviewItem.classList.add('editing');
+
+    const originalText = textDiv.innerText.replace(/^“|”$/g, '');
+
+    textDiv.innerHTML = `
+        <textarea class="form-control mb-2" rows="2">${originalText}</textarea>
+        <div>
+            <button class="btn btn-sm btn-success me-1">💾 Zapisz</button>
+            <button class="btn btn-sm btn-secondary">✖ Anuluj</button>
+        </div>
+    `;
+
+    const textarea = textDiv.querySelector('textarea');
+    const saveBtn = textDiv.querySelector('.btn-success');
+    const cancelBtn = textDiv.querySelector('.btn-secondary');
+
+    saveBtn.onclick = async () => {
+        const newText = textarea.value.trim();
+        if (!newText) return;
+
+        const res = await fetch(`/edit_review/${reviewId}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ review_text: newText })
+        });
+
+        if (res.ok) {
+            textDiv.innerHTML = `“${newText}”`;
+            reviewItem.classList.remove('editing');
+        } else {
+            alert("Błąd zapisu");
+        }
+    };
+
+    cancelBtn.onclick = () => {
+        textDiv.innerHTML = `“${originalText}”`;
+        reviewItem.classList.remove('editing');
+    };
 }
 
 document.querySelectorAll(".md").forEach(el => {
@@ -214,6 +281,10 @@ document.querySelectorAll('.add-review-form').forEach(form => {
 
         if (res.ok) location.reload();
     });
+});
+
+document.getElementById('perPageSelect').addEventListener('change', function() {
+    document.getElementById('searchForm').submit();
 });
 </script>
 
