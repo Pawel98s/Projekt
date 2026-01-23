@@ -8,13 +8,9 @@
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 
     <style>
-        body {
-            background: #f5f5f5;
-        }
+        body { background: #f5f5f5; }
 
-        .summary-cell .md {
-            font-size: 0.95rem;
-        }
+        .summary-cell .md { font-size: 0.95rem; }
 
         .review-card {
             background: #f8f9fa;
@@ -47,9 +43,7 @@
             width: 100%;
         }
 
-        .review-actions button {
-            margin-left: 4px;
-        }
+        .review-actions button { margin-left: 4px; }
 
         .add-review-box {
             margin-top: 12px;
@@ -65,7 +59,21 @@
 <div class="container">
 
     <h2 class="mb-3">📦 Produkty</h2>
-    <a href="/add.html" class="btn btn-primary mb-3">➕ Dodaj nowy produkt</a>
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <a href="/add.html" class="btn btn-primary">➕ Dodaj nowy produkt</a>
+
+        <!-- 🔍 WYSZUKIWARKA -->
+        <form class="d-flex" method="get" action="/view.html">
+            <input type="text"
+                   class="form-control me-2"
+                   name="q"
+                   placeholder="Szukaj produktu..."
+                   value="{{ q }}">
+            <input type="hidden" name="page" value="1">
+            <button class="btn btn-outline-secondary">Szukaj</button>
+        </form>
+    </div>
 
     <table class="table table-bordered align-middle bg-white">
         <thead class="table-dark">
@@ -95,7 +103,9 @@
                 {% endif %}
             </td>
             <td>
-                <a href="/edit/{{ id }}" class="btn btn-sm btn-warning mb-1 w-100">✏ Edytuj</a>
+                <a href="/edit/{{ id }}?page={{ page }}&q={{ q }}"
+                   class="btn btn-sm btn-warning mb-1 w-100">✏ Edytuj</a>
+
                 <button onclick="deleteProduct({{ id }})"
                         class="btn btn-sm btn-danger w-100">🗑 Usuń</button>
             </td>
@@ -126,11 +136,10 @@
                     <div class="add-review-box">
                         <form class="add-review-form" data-product-id="{{ id }}">
                             <label class="form-label fw-bold">➕ Dodaj opinię</label>
-                            <textarea name="review_text"
-                                      class="form-control mb-2"
+                            <textarea class="form-control mb-2"
                                       rows="2"
                                       required></textarea>
-                            <button type="submit" class="btn btn-sm btn-success">💬 Dodaj opinię</button>
+                            <button class="btn btn-sm btn-success">💬 Dodaj opinię</button>
                         </form>
                     </div>
                 </div>
@@ -140,64 +149,50 @@
         {% endfor %}
         </tbody>
     </table>
+
+    <!-- 📄 PAGINACJA -->
+    <nav class="d-flex justify-content-center mt-4">
+        <ul class="pagination">
+            {% if page > 1 %}
+                <li class="page-item">
+                    <a class="page-link"
+                       href="/view.html?page={{ page-1 }}&q={{ q }}">«</a>
+                </li>
+            {% endif %}
+
+            {% for p in range(1, total_pages + 1) %}
+                <li class="page-item {% if p == page %}active{% endif %}">
+                    <a class="page-link"
+                       href="/view.html?page={{ p }}&q={{ q }}">{{ p }}</a>
+                </li>
+            {% endfor %}
+
+            {% if page < total_pages %}
+                <li class="page-item">
+                    <a class="page-link"
+                       href="/view.html?page={{ page+1 }}&q={{ q }}">»</a>
+                </li>
+            {% endif %}
+        </ul>
+    </nav>
+
 </div>
 
 <script>
 async function deleteProduct(id) {
     if (!confirm("Czy na pewno chcesz usunąć produkt?")) return;
-    const res = await fetch(`/delete/${id}`, { method: 'DELETE' });
-    if (res.ok) location.reload();
+    const params = new URLSearchParams(window.location.search);
+    const res = await fetch(`/delete/${id}?${params}`, { method: 'DELETE' });
+    if (res.ok) {
+        const data = await res.json();
+        window.location.href = data.redirect;
+    }
 }
 
 async function deleteReview(id) {
     if (!confirm("Usunąć opinię?")) return;
     const res = await fetch(`/delete_review/${id}`, { method: "DELETE" });
     if (res.ok) location.reload();
-}
-
-function startEditReview(button, reviewId) {
-    const reviewItem = button.closest('.review-item');
-    const textDiv = reviewItem.querySelector('.review-text');
-
-    if (reviewItem.classList.contains('editing')) return;
-    reviewItem.classList.add('editing');
-
-    const originalText = textDiv.innerText.replace(/^“|”$/g, '');
-
-    textDiv.innerHTML = `
-        <textarea class="form-control mb-2" rows="2">${originalText}</textarea>
-        <div>
-            <button class="btn btn-sm btn-success me-1">💾 Zapisz</button>
-            <button class="btn btn-sm btn-secondary">✖ Anuluj</button>
-        </div>
-    `;
-
-    const textarea = textDiv.querySelector('textarea');
-    const saveBtn = textDiv.querySelector('.btn-success');
-    const cancelBtn = textDiv.querySelector('.btn-secondary');
-
-    saveBtn.onclick = async () => {
-        const newText = textarea.value.trim();
-        if (!newText) return;
-
-        const res = await fetch(`/edit_review/${reviewId}`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ review_text: newText })
-        });
-
-        if (res.ok) {
-            textDiv.innerHTML = `“${newText}”`;
-            reviewItem.classList.remove('editing');
-        } else {
-            alert("Błąd zapisu");
-        }
-    };
-
-    cancelBtn.onclick = () => {
-        textDiv.innerHTML = `“${originalText}”`;
-        reviewItem.classList.remove('editing');
-    };
 }
 
 document.querySelectorAll(".md").forEach(el => {
@@ -207,10 +202,8 @@ document.querySelectorAll(".md").forEach(el => {
 document.querySelectorAll('.add-review-form').forEach(form => {
     form.addEventListener('submit', async e => {
         e.preventDefault();
-
         const productId = form.dataset.productId;
-        const textarea = form.querySelector('textarea');
-        const text = textarea.value.trim();
+        const text = form.querySelector('textarea').value.trim();
         if (!text) return;
 
         const res = await fetch('/addReview', {

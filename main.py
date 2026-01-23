@@ -7,6 +7,7 @@ import fitz
 from bs4 import BeautifulSoup
 import requests
 import uuid
+import math
 
 app = Flask(__name__)
 app.secret_key = "cookie"
@@ -63,7 +64,10 @@ def log_event(action: str, details: str = ""):
     try:
         conn = get_db_connection()
         cur = conn.cursor()
-        cur.execute("INSERT INTO logs (action, details) VALUES (%s, %s)", (action, details))
+        cur.execute(
+            "INSERT INTO logs (action, details) VALUES (%s, %s)",
+            (action, details)
+        )
         conn.commit()
         cur.close()
         conn.close()
@@ -122,114 +126,96 @@ Upewnij się, że w streszczeniu znajdują się nazwa produktu, typ oraz marka.
 def home():
     return render_template('index.html')
 
+
 @app.route('/add.html', methods=['GET', 'POST'])
 def add_product():
     if request.method == 'POST':
         name = request.form.get('name')
         link = request.form.get('link')
+
         description = generate_summary_from_link(link)
         embedding = model.encode(description).tolist()
 
         conn = get_db_connection()
         cur = conn.cursor()
-        cur.execute("INSERT INTO products (name, description, link, embedding) VALUES (%s,%s,%s,%s)",
-                    (name, description, link, embedding))
+        cur.execute(
+            "INSERT INTO products (name, description, link, embedding) VALUES (%s,%s,%s,%s)",
+            (name, description, link, embedding)
+        )
         conn.commit()
         cur.close()
         conn.close()
 
-        log_event("ADD_PRODUCT", f"Added product '{name}', link: {link}")
-        return redirect('/view.html')
+        log_event("ADD_PRODUCT", f"Added product '{name}'")
+
+        return redirect('/view.html?page=1')
 
     return render_template('add.html')
 
+
 @app.route('/view.html')
 def view_products():
+    page = request.args.get("page", 1, type=int)
+    q = request.args.get("q", "", type=str)
+
+    per_page = 5
+    offset = (page - 1) * per_page
+
     conn = get_db_connection()
     cur = conn.cursor()
-    cur.execute("""
-        SELECT p.id, p.name, p.description, p.link,
-       json_agg(
-           json_build_object(
-               'id', r.id,
-               'text', r.review_text
-           )
-       ) FILTER (WHERE r.id IS NOT NULL) AS reviews
-FROM products p
-LEFT JOIN reviews r ON r.product_id = p.id
-GROUP BY p.id
-ORDER BY p.id
 
-    """)
+    where_clause = ""
+    params = []
+
+    if q:
+        where_clause = "WHERE p.name ILIKE %s OR p.description ILIKE %s"
+        params.extend([f"%{q}%", f"%{q}%"])
+
+    cur.execute(f"""
+        SELECT COUNT(*)
+        FROM products p
+        {where_clause}
+    """, params)
+
+    total_products = cur.fetchone()[0]
+    total_pages = max(1, math.ceil(total_products / per_page))
+
+    cur.execute(f"""
+        SELECT p.id, p.name, p.description, p.link,
+               json_agg(
+                   json_build_object(
+                       'id', r.id,
+                       'text', r.review_text
+                   )
+               ) FILTER (WHERE r.id IS NOT NULL) AS reviews
+        FROM products p
+        LEFT JOIN reviews r ON r.product_id = p.id
+        {where_clause}
+        GROUP BY p.id
+        ORDER BY p.id
+        LIMIT %s OFFSET %s
+    """, params + [per_page, offset])
+
     products = cur.fetchall()
     cur.close()
     conn.close()
-    return render_template('view.html', products=products)
 
-@app.route('/delete_review/<int:id>', methods=['DELETE'])
-def delete_review(id):
-    conn = get_db_connection()
-    cur = conn.cursor()
-
-    cur.execute("SELECT review_text FROM reviews WHERE id=%s", (id,))
-    row = cur.fetchone()
-
-    if not row:
-        cur.close()
-        conn.close()
-        return jsonify({"error": "Opinia nie istnieje"}), 404
-
-    cur.execute("DELETE FROM reviews WHERE id=%s", (id,))
-    conn.commit()
-
-    cur.close()
-    conn.close()
-
-    log_event("DELETE_REVIEW", f"Deleted review ID {id}")
-    return jsonify({"status": "ok"})
-
-
-@app.route('/edit_review/<int:id>', methods=['POST'])
-def edit_review(id):
-    data = request.json
-    new_text = data.get("review_text")
-
-    conn = get_db_connection()
-    cur = conn.cursor()
-
-    cur.execute("""
-        UPDATE reviews
-        SET review_text = %s
-        WHERE id = %s
-    """, (new_text, id))
-
-    conn.commit()
-    cur.close()
-    conn.close()
-
-    log_event("EDIT_REVIEW", f"Edited review ID {id}")
-    return jsonify({"status": "ok"})
-
-
-@app.route('/product/<int:product_id>')
-def product_page(product_id):
-    conn = get_db_connection()
-    cur = conn.cursor()
-    cur.execute("SELECT name, description, link FROM products WHERE id=%s", (product_id,))
-    row = cur.fetchone()
-    cur.close()
-    conn.close()
-    if not row:
-        return "Produkt nie znaleziony", 404
-    name, description, link = row
-    return render_template('product.html', name=name, description=description, link=link)
+    return render_template(
+        'view.html',
+        products=products,
+        page=page,
+        total_pages=total_pages,
+        q=q
+    )
 
 
 @app.route('/delete/<int:id>', methods=['DELETE'])
 def delete_product(id):
+    page = request.args.get("page", 1)
+    q = request.args.get("q", "")
+
     conn = get_db_connection()
     cur = conn.cursor()
-
 
     cur.execute("SELECT name FROM products WHERE id = %s", (id,))
     row = cur.fetchone()
@@ -237,10 +223,8 @@ def delete_product(id):
     if not row:
         cur.close()
         conn.close()
-        log_event("DELETE_PRODUCT_FAIL", f"Tried to delete missing product ID {id}")
+        log_event("DELETE_PRODUCT_FAIL", f"Missing product {id}")
         return jsonify({"error": "Produkt nie istnieje"}), 404
-
-    product_name = row[0]
 
     cur.execute("DELETE FROM products WHERE id = %s", (id,))
     conn.commit()
@@ -248,15 +232,20 @@ def delete_product(id):
     cur.close()
     conn.close()
 
-    log_event("DELETE_PRODUCT", f"Deleted product '{product_name}' (ID {id})")
+    log_event("DELETE_PRODUCT", f"Deleted product {id}")
 
-    return jsonify({"message": "Produkt usunięty!"}), 200
+    return jsonify({
+        "redirect": f"/view.html?page={page}&q={q}"
+    })
+
 
 @app.route('/edit/<int:id>', methods=['GET', 'POST'])
 def edit_product(id):
+    page = request.args.get("page", 1)
+    q = request.args.get("q", "")
+
     conn = get_db_connection()
     cur = conn.cursor()
-
 
     cur.execute("SELECT name, link FROM products WHERE id = %s", (id,))
     product = cur.fetchone()
@@ -264,9 +253,6 @@ def edit_product(id):
     if not product:
         cur.close()
         conn.close()
-
-        log_event("EDIT_PRODUCT_FAIL", f"Tried to edit missing product ID {id}")
-
         return "Produkt nie istnieje", 404
 
     old_name, old_link = product
@@ -276,34 +262,25 @@ def edit_product(id):
         new_link = request.form.get('link')
 
         new_description = generate_summary_from_link(new_link)
-
         new_embedding = model.encode(new_description).tolist()
 
         cur.execute("""
             UPDATE products
-            SET name = %s,
-                link = %s,
-                description = %s,
-                embedding = %s
-            WHERE id = %s
+            SET name=%s, link=%s, description=%s, embedding=%s
+            WHERE id=%s
         """, (new_name, new_link, new_description, new_embedding, id))
 
         conn.commit()
         cur.close()
         conn.close()
 
-        log_event(
-            "EDIT_PRODUCT",
-            f"Edited product ID {id}. Old name: '{old_name}', New name: '{new_name}', Old link: '{old_link}', New link: '{new_link}'"
-        )
+        log_event("EDIT_PRODUCT", f"{old_name} -> {new_name}")
 
-        return redirect('/view.html')
+        return redirect(f"/view.html?page={page}&q={q}")
 
     cur.close()
     conn.close()
-
-    return render_template('edit.html', id=id, name=old_name, link=old_link)
-
+    return render_template('edit.html', id=id, name=old_name, link=old_link, page=page, q=q)
 
 
 
