@@ -399,7 +399,6 @@ Zasady odpowiedzi:
         return jsonify({"answer": answer, "products": products_info})
 
     except Exception as e:
-        # Nawet przy błędzie zwracamy zawsze te same klucze
         return jsonify({"answer": f"Błąd: {str(e)}", "products": []})
 
 
