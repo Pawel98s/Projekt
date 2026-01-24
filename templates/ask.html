@@ -68,7 +68,7 @@
         products.forEach(p => {
             const card = document.createElement("div");
             card.className = "product-card";
-            card.onclick = () => window.location.href = `/product/${p.id}`;
+            card.onclick = () => window.open(`/product/${p.id}`, '_blank');
 
             const img = document.createElement("img");
             img.src = p.image_url || "/static/no_image.png";

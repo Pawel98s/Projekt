@@ -106,8 +106,24 @@ def generate_summary_from_link(link: str) -> str:
     if not text:
         return "Brak dostępnej treści do streszczenia."
     prompt = f"""
-Na podstawie poniższego tekstu wygeneruj szczegółowe streszczenie produktu.
-Upewnij się, że w streszczeniu znajdują się nazwa produktu, typ oraz marka.
+Na podstawie poniższego tekstu wygeneruj opis produktu w formacie MARKDOWN.
+
+WYMAGANIA:
+- Użyj nagłówków sekcji w formacie: ## Nazwa sekcji
+- Sekcje MUSZĄ występować w tej kolejności:
+  1. ## Podstawowe informacje
+  2. ## Parametry techniczne
+  3. ## Ergonomia i bezpieczeństwo
+  4. ## Zastosowanie
+  5. ## Podsumowanie
+- W sekcji "Podstawowe informacje" MUSZĄ znaleźć się:
+  - Nazwa produktu
+  - Typ
+  - Marka
+- Stosuj listy punktowane tam, gdzie to możliwe
+- Nie dodawaj nic poza treścią opisu
+
+TEKST ŹRÓDŁOWY:
 {text}
 """
     try:
@@ -252,14 +268,49 @@ def edit_review(id):
 def product_page(product_id):
     conn = get_db_connection()
     cur = conn.cursor()
-    cur.execute("SELECT name, description, link FROM products WHERE id=%s", (product_id,))
-    row = cur.fetchone()
+
+
+    cur.execute(
+        "SELECT name, description, link FROM products WHERE id = %s",
+        (product_id,)
+    )
+    product = cur.fetchone()
+
+    if not product:
+        cur.close()
+        conn.close()
+        return "Produkt nie znaleziony", 404
+
+    name, description, link = product
+
+
+    cur.execute(
+        """
+        SELECT id, review_text
+        FROM reviews
+        WHERE product_id = %s
+        ORDER BY id DESC
+        """,
+        (product_id,)
+    )
+
+    reviews = [
+        {"id": r[0], "text": r[1]}
+        for r in cur.fetchall()
+    ]
+
     cur.close()
     conn.close()
-    if not row:
-        return "Produkt nie znaleziony", 404
-    name, description, link = row
-    return render_template('product.html', name=name, description=description, link=link)
+
+    return render_template(
+        'product.html',
+        product_id=product_id,
+        name=name,
+        description=description,
+        link=link,
+        reviews=reviews
+    )
+
 
 @app.route('/delete/<int:id>', methods=['DELETE'])
 def delete_product(id):
