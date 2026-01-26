@@ -3,13 +3,64 @@
 <head>
     <meta charset="UTF-8">
     <title>Logi systemowe</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 
     <style>
         body {
-            font-family: Arial, sans-serif;
             background: #f7f7f7;
-            padding: 20px;
+            min-height: 100vh;
+            margin: 0;
+            padding-top: 64px;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         }
+
+
+        .topbar {
+            position: fixed;
+            top: 0;
+            width: 100%;
+            height: 64px;
+            background: #2f3439;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.25);
+            z-index: 1030;
+        }
+
+        .topbar .container {
+            max-width: 1200px;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .logo {
+            color: #ffffff;
+            font-weight: 600;
+            font-size: 18px;
+        }
+
+        .menu {
+            display: flex;
+            gap: 22px;
+        }
+
+        .menu a {
+            color: #cfd3d7;
+            text-decoration: none;
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 15px;
+            transition: 0.2s;
+        }
+
+        .menu a:hover,
+        .menu a.active {
+            color: #ffffff;
+            background: rgba(255,255,255,0.15);
+        }
+
 
         h1 {
             text-align: center;
@@ -38,11 +89,6 @@
             background: #f1f1f1;
         }
 
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-
         #search {
             width: 300px;
             padding: 10px;
@@ -52,7 +98,6 @@
     </style>
 
     <script>
-        // Sortowanie kolumn
         function sortTable(col) {
             let table = document.getElementById("logTable");
             let rows = Array.from(table.rows).slice(1);
@@ -68,7 +113,6 @@
             table.setAttribute("data-sort", asc ? "asc" : "desc");
         }
 
-        // Wyszukiwarka logów
         function filterLogs() {
             let filter = document.getElementById("search").value.toLowerCase();
             let rows = document.querySelectorAll("#logTable tr");
@@ -81,12 +125,34 @@
         }
     </script>
 </head>
+
 <body>
-<div class="container">
+
+
+<nav class="topbar">
+    <div class="container">
+        <div class="logo">Praca inżynierska</div>
+        <div class="menu">
+            <a href="/">Start</a>
+            <a href="add.html">➕ Dodaj</a>
+            <a href="view.html">📋 Lista</a>
+            <a href="ask.html">🔍 Wyszukiwanie</a>
+            <a href="/logs" class="active">📄 Logi</a>
+        </div>
+    </div>
+</nav>
+
+
+<div class="container py-4">
 
     <h1>Panel logów systemowych</h1>
 
-    <input id="search" type="text" placeholder="Szukaj w logach..." onkeyup="filterLogs()">
+    <input id="search"
+           type="text"
+           class="form-control mb-3"
+           placeholder="Szukaj w logach..."
+           onkeyup="filterLogs()"
+           style="max-width: 300px;">
 
     <table id="logTable" data-sort="asc">
         <tr>
@@ -107,5 +173,6 @@
     </table>
 
 </div>
+
 </body>
 </html>
