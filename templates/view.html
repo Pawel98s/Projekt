@@ -114,7 +114,7 @@
 
 <nav class="topbar">
     <div class="container">
-        <div class="logo">Praca inżynierska</div>
+        <div class="logo">Asystent produktowy</div>
         <div class="menu">
             <a href="/">Start</a>
             <a href="add.html">➕ Dodaj</a>
@@ -191,11 +191,9 @@
             </td>
 
             <td>
-                {% if link %}
-                    <a href="{{ link }}" target="_blank">Strona producenta</a>
-                {% else %}
-                    —
-                {% endif %}
+                <a href="/product/{{ id }}" class="btn btn-sm btn-outline-primary">
+                    🔎 Szczegóły
+                </a>
             </td>
 
             <td>
