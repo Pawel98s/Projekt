@@ -1,102 +1,56 @@
-<!DOCTYPE html>
-<html lang="pl">
-<head>
-    <meta charset="UTF-8">
-    <title>Dodaj produkt</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+{% extends "navibar.html" %}
 
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+{% block title %}Dodaj produkt{% endblock %}
 
-    <style>
-        body {
-            margin: 0;
-            padding-top: 64px;
-            background: #f5f5f5;
-            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        }
+{% block content %}
 
+<div class="row justify-content-center">
+  <div class="col-lg-6">
 
-        .topbar {
-            position: fixed;
-            top: 0;
-            width: 100%;
-            height: 64px;
-            background: #2f3439;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.25);
-            z-index: 1030;
-        }
+    <div class="card shadow-sm">
+      <div class="card-body">
 
-        .topbar .container {
-            max-width: 1200px;
-            height: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
+        <h3 class="mb-4 text-center">➕ Dodaj nowy produkt</h3>
 
-        .logo {
-            color: #ffffff;
-            font-weight: 600;
-            font-size: 18px;
-        }
+        <form method="POST">
 
-        .menu {
-            display: flex;
-            gap: 22px;
-        }
-
-        .menu a {
-            color: #cfd3d7;
-            text-decoration: none;
-            padding: 6px 10px;
-            border-radius: 6px;
-            font-size: 15px;
-            transition: 0.2s;
-        }
-
-        .menu a:hover,
-        .menu a.active {
-            color: #ffffff;
-            background: rgba(255,255,255,0.15);
-        }
-    </style>
-</head>
-
-<body>
-
-
-<nav class="topbar">
-    <div class="container">
-        <div class="logo">Asystent produktowy</div>
-        <div class="menu">
-            <a href="/">Start</a>
-            <a href="add.html" class="active">➕ Dodaj</a>
-            <a href="view.html">📋 Lista</a>
-            <a href="ask.html">🔍 Wyszukiwanie</a>
-            <a href="/logs">📄 Logi</a>
-        </div>
-    </div>
-</nav>
-
-
-<div class="container mt-4">
-    <h2>Dodaj produkt</h2>
-
-    <form method="POST" class="mt-3">
-        <div class="mb-3">
+          <div class="mb-3">
             <label class="form-label">Nazwa produktu</label>
-            <input type="text" name="name" class="form-control" required>
-        </div>
+            <input
+              type="text"
+              name="name"
+              class="form-control"
+              required
+            >
+          </div>
 
-        <div class="mb-3">
-            <label class="form-label">Link do dokumentacji</label>
-            <input type="url" name="link" class="form-control" required>
-        </div>
 
-        <button type="submit" class="btn btn-primary">Dodaj</button>
-        <a href="/" class="btn btn-secondary">Anuluj</a>
-    </form>
+          <div class="mb-4">
+            <label class="form-label">Link do dokumentacji / strony produktu</label>
+            <input
+              type="url"
+              name="link"
+              class="form-control"
+              placeholder="https://..."
+              required
+            >
+            <div class="form-text">
+              Na podstawie linku system automatycznie wygeneruje opis produktu.
+            </div>
+          </div>
+
+          <div class="d-flex justify-content-between">
+            <button type="submit" class="btn btn-primary">
+              💾 Dodaj produkt
+            </button>
+          </div>
+
+        </form>
+
+      </div>
+    </div>
+
+  </div>
 </div>
 
-</body>
-</html>
+{% endblock %}

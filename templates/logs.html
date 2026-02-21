@@ -1,178 +1,105 @@
-<!DOCTYPE html>
-<html lang="pl">
-<head>
-    <meta charset="UTF-8">
-    <title>Logi systemowe</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+{% extends "navibar.html" %}
 
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+{% block title %}Logi systemowe{% endblock %}
 
-    <style>
-        body {
-            background: #f7f7f7;
-            min-height: 100vh;
-            margin: 0;
-            padding-top: 64px;
-            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        }
+{% block extra_css %}
+body {
+    background: #f7f7f7;
+}
 
+h1 {
+    text-align: center;
+    margin-bottom: 25px;
+}
 
-        .topbar {
-            position: fixed;
-            top: 0;
-            width: 100%;
-            height: 64px;
-            background: #2f3439;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.25);
-            z-index: 1030;
-        }
+table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+    box-shadow: 0 0 8px rgba(0,0,0,0.1);
+}
 
-        .topbar .container {
-            max-width: 1200px;
-            height: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
+th, td {
+    padding: 12px;
+    border-bottom: 1px solid #ddd;
+}
 
-        .logo {
-            color: #ffffff;
-            font-weight: 600;
-            font-size: 18px;
-        }
+th {
+    background: #333;
+    color: white;
+    cursor: pointer;
+}
 
-        .menu {
-            display: flex;
-            gap: 22px;
-        }
+tr:hover {
+    background: #f1f1f1;
+}
 
-        .menu a {
-            color: #cfd3d7;
-            text-decoration: none;
-            padding: 6px 10px;
-            border-radius: 6px;
-            font-size: 15px;
-            transition: 0.2s;
-        }
-
-        .menu a:hover,
-        .menu a.active {
-            color: #ffffff;
-            background: rgba(255,255,255,0.15);
-        }
+#search {
+    width: 300px;
+    padding: 10px;
+    font-size: 16px;
+}
+{% endblock %}
 
 
-        h1 {
-            text-align: center;
-            margin-bottom: 25px;
-        }
+{% block content %}
 
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            background: white;
-            box-shadow: 0 0 8px rgba(0,0,0,0.1);
-        }
+<h1>Panel logów systemowych</h1>
 
-        th, td {
-            padding: 12px;
-            border-bottom: 1px solid #ddd;
-        }
+<input id="search"
+       type="text"
+       class="form-control mb-3"
+       placeholder="Szukaj w logach..."
+       onkeyup="filterLogs()"
+       style="max-width: 300px;">
 
-        th {
-            background: #333;
-            color: white;
-            cursor: pointer;
-        }
+<table id="logTable" data-sort="asc">
+    <tr>
+        <th onclick="sortTable(0)">ID</th>
+        <th onclick="sortTable(1)">Akcja</th>
+        <th onclick="sortTable(2)">Szczegóły</th>
+        <th onclick="sortTable(3)">Data</th>
+    </tr>
 
-        tr:hover {
-            background: #f1f1f1;
-        }
+    {% for log in logs %}
+    <tr>
+        <td>{{ log[0] }}</td>
+        <td>{{ log[1] }}</td>
+        <td>{{ log[2] }}</td>
+        <td>{{ log[3] }}</td>
+    </tr>
+    {% endfor %}
+</table>
 
-        #search {
-            width: 300px;
-            padding: 10px;
-            font-size: 16px;
-            margin-bottom: 15px;
-        }
-    </style>
-
-    <script>
-        function sortTable(col) {
-            let table = document.getElementById("logTable");
-            let rows = Array.from(table.rows).slice(1);
-            let asc = table.getAttribute("data-sort") !== "asc";
-
-            rows.sort((a, b) => {
-                let A = a.cells[col].innerText.trim();
-                let B = b.cells[col].innerText.trim();
-                return asc ? A.localeCompare(B) : B.localeCompare(A);
-            });
-
-            rows.forEach(r => table.appendChild(r));
-            table.setAttribute("data-sort", asc ? "asc" : "desc");
-        }
-
-        function filterLogs() {
-            let filter = document.getElementById("search").value.toLowerCase();
-            let rows = document.querySelectorAll("#logTable tr");
-
-            rows.forEach((row, idx) => {
-                if (idx === 0) return;
-                let text = row.innerText.toLowerCase();
-                row.style.display = text.includes(filter) ? "" : "none";
-            });
-        }
-    </script>
-</head>
-
-<body>
+{% endblock %}
 
 
-<nav class="topbar">
-    <div class="container">
-        <div class="logo">Asystent produktowy</div>
-        <div class="menu">
-            <a href="/">Start</a>
-            <a href="add.html">➕ Dodaj</a>
-            <a href="view.html">📋 Lista</a>
-            <a href="ask.html">🔍 Wyszukiwanie</a>
-            <a href="/logs" class="active">📄 Logi</a>
-        </div>
-    </div>
-</nav>
+{% block extra_scripts %}
+<script>
+function sortTable(col) {
+    let table = document.getElementById("logTable");
+    let rows = Array.from(table.rows).slice(1);
+    let asc = table.getAttribute("data-sort") !== "asc";
 
+    rows.sort((a, b) => {
+        let A = a.cells[col].innerText.trim();
+        let B = b.cells[col].innerText.trim();
+        return asc ? A.localeCompare(B) : B.localeCompare(A);
+    });
 
-<div class="container py-4">
+    rows.forEach(r => table.appendChild(r));
+    table.setAttribute("data-sort", asc ? "asc" : "desc");
+}
 
-    <h1>Panel logów systemowych</h1>
+function filterLogs() {
+    let filter = document.getElementById("search").value.toLowerCase();
+    let rows = document.querySelectorAll("#logTable tr");
 
-    <input id="search"
-           type="text"
-           class="form-control mb-3"
-           placeholder="Szukaj w logach..."
-           onkeyup="filterLogs()"
-           style="max-width: 300px;">
-
-    <table id="logTable" data-sort="asc">
-        <tr>
-            <th onclick="sortTable(0)">ID</th>
-            <th onclick="sortTable(1)">Akcja</th>
-            <th onclick="sortTable(2)">Szczegóły</th>
-            <th onclick="sortTable(3)">Data</th>
-        </tr>
-
-        {% for log in logs %}
-        <tr>
-            <td>{{ log[0] }}</td>
-            <td>{{ log[1] }}</td>
-            <td>{{ log[2] }}</td>
-            <td>{{ log[3] }}</td>
-        </tr>
-        {% endfor %}
-    </table>
-
-</div>
-
-</body>
-</html>
+    rows.forEach((row, idx) => {
+        if (idx === 0) return;
+        let text = row.innerText.toLowerCase();
+        row.style.display = text.includes(filter) ? "" : "none";
+    });
+}
+</script>
+{% endblock %}
