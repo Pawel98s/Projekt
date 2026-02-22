@@ -1,0 +1,97 @@
+let history = [];
+
+function addMessage(sender, text) {
+  const chat = document.getElementById("chat");
+  const div = document.createElement("div");
+  div.className = sender === "user" ? "msg-user" : "msg-ai";
+
+  const bubble = document.createElement("div");
+  bubble.className = "bubble";
+
+  if (sender === "ai") {
+    bubble.innerHTML = marked.parse(text);
+  } else {
+    bubble.innerText = text;
+  }
+
+  div.appendChild(bubble);
+  chat.appendChild(div);
+  chat.scrollTop = chat.scrollHeight;
+}
+
+function addProducts(products) {
+  const chat = document.getElementById("chat");
+
+  products.forEach(p => {
+    const card = document.createElement("div");
+    card.className = "product-card";
+    card.onclick = () => window.open(`/product/${p.id}`, "_blank");
+
+    const img = document.createElement("img");
+    img.src = p.image_url || "/static/no_image.png";
+    img.className = "product-img";
+
+    const name = document.createElement("div");
+    name.innerText = p.name;
+    name.className = "fw-bold mt-2";
+
+    card.appendChild(img);
+    card.appendChild(name);
+
+    chat.appendChild(card);
+  });
+
+  chat.scrollTop = chat.scrollHeight;
+}
+
+async function sendMessage(event) {
+  event.preventDefault();
+  const question = document.getElementById("question").value.trim();
+  if (!question) return;
+
+  addMessage("user", question);
+  document.getElementById("question").value = "";
+  addMessage("ai", "⏳ Myślę...");
+
+  try {
+    const res = await fetch("/ask", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question })
+    });
+
+    const data = await res.json();
+    document.querySelector(".msg-ai:last-child").remove();
+
+    if (data.answer) {
+      addMessage("ai", data.answer);
+    } else {
+      addMessage("ai", "Brak odpowiedzi od AI.");
+    }
+
+    if (data.products && data.products.length > 0) {
+      addProducts(data.products);
+    }
+  } catch (err) {
+    document.querySelector(".msg-ai:last-child").remove();
+    addMessage("ai", "Błąd połączenia z serwerem.");
+    console.error(err);
+  }
+}
+
+function newChat() {
+  history = [];
+  document.getElementById("chat").innerHTML = "";
+  fetch("/new_chat");
+}
+
+document.addEventListener("DOMContentLoaded", async () => {
+  const res = await fetch("/get_history");
+  const hist = await res.json();
+
+  history = hist;
+
+  hist.forEach(msg => {
+    addMessage(msg.role === "user" ? "user" : "ai", msg.content);
+  });
+});

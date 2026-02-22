@@ -57,7 +57,7 @@
         {% endif %}
 
         <div class="add-review-box">
-            <form id="addReviewForm">
+            <form id="addReviewForm" data-product-id="{{ product_id }}">
                 <label class="form-label fw-bold">➕ Dodaj opinię</label>
                 <textarea class="form-control mb-2" rows="2" required></textarea>
                 <button class="btn btn-success btn-sm">💬 Dodaj</button>
@@ -71,64 +71,5 @@
 
 
 {% block extra_scripts %}
-<script>
-document.querySelectorAll(".md").forEach(el => {
-    el.innerHTML = marked.parse(el.innerText);
-});
-
-async function deleteReview(id) {
-    if (!confirm("Usunąć opinię?")) return;
-    const res = await fetch(`/delete_review/${id}`, { method: "DELETE" });
-    if (res.ok) location.reload();
-}
-
-function startEditReview(btn, id) {
-    const item = btn.closest('.review-item');
-    if (item.classList.contains('editing')) return;
-
-    item.classList.add('editing');
-    const textDiv = item.querySelector('.review-text');
-    const original = textDiv.innerText.replace(/^“|”$/g, '');
-
-    textDiv.innerHTML = `
-        <textarea class="form-control mb-2">${original}</textarea>
-        <button class="btn btn-sm btn-success me-1">💾</button>
-        <button class="btn btn-sm btn-secondary">✖</button>
-    `;
-
-    const [save, cancel] = textDiv.querySelectorAll('button');
-
-    save.onclick = async () => {
-        const text = textDiv.querySelector('textarea').value.trim();
-        if (!text) return;
-
-        const res = await fetch(`/edit_review/${id}`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ review_text: text })
-        });
-
-        if (res.ok) location.reload();
-    };
-
-    cancel.onclick = () => location.reload();
-}
-
-document.getElementById('addReviewForm').addEventListener('submit', async e => {
-    e.preventDefault();
-    const text = e.target.querySelector('textarea').value.trim();
-    if (!text) return;
-
-    const res = await fetch('/addReview', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            product_id: {{ product_id }},
-            review_text: text
-        })
-    });
-
-    if (res.ok) location.reload();
-});
-</script>
+<script src="{{ url_for('static', filename='js/product.js') }}" defer></script>
 {% endblock %}
