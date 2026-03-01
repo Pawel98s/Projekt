@@ -15,6 +15,8 @@ def register_api(api_bp, deps):
             session["session_id"] = str(uuid.uuid4())
         if "history" not in session:
             session["history"] = []
+        if "last_product_ids" not in session:
+            session["last_product_ids"] = []
 
     @api_bp.get("/get_history")
     def get_history():
@@ -30,30 +32,30 @@ def register_api(api_bp, deps):
         history = session.get("history", [])
         history.append({"role": "user", "content": question})
 
-        answer, rows = chat_service.answer(question, history)
+        last_ids = session.get("last_product_ids", [])
+        answer, rows, new_last_ids = chat_service.answer(question, history, last_ids)
+        session["last_product_ids"] = new_last_ids
 
         history.append({"role": "assistant", "content": answer})
         session["history"] = history
         session.modified = True
 
-
         products_info = []
-        answer_lower = answer.lower()
         for pid, name, desc, link, reviews in rows:
-            if any(word.lower() in answer_lower for word in name.split()):
-                products_info.append({
-                    "id": pid,
-                    "name": name,
-                    "link": link or f"/product/{pid}",
-                    "capacity": None,
-                    "image_url": "/static/no_image.png"
-                })
+            products_info.append({
+                "id": pid,
+                "name": name,
+                "link": link or f"/product/{pid}",
+                "capacity": None,
+                "image_url": "/static/no_image.png"
+            })
 
         return jsonify({"answer": answer, "products": products_info})
 
     @api_bp.get("/new_chat")
     def new_chat():
         session["history"] = []
+        session.pop("last_product_ids", None)
         session.modified = True
         return jsonify({"status": "ok"})
 

@@ -1,4 +1,5 @@
 import math
+import re
 from database_connection import get_db_connection
 
 class ProductRepository:
@@ -97,4 +98,106 @@ class ProductRepository:
         rows = cur.fetchall()
         cur.close()
         conn.close()
+        return rows
+
+    def keyword_search_top5_tokens(self, question: str):
+        """
+        Lepsze wyszukiwanie keywordowe:
+        - bierze max 6 tokenów
+        - daje scoring (nazwa ważniejsza niż opis)
+        - sortuje po trafności
+        - zwraca więcej kandydatów (20), żeby LLM mógł odsiać
+        """
+
+        def normalize_pl(word: str) -> str:
+            for suf in ["ów", "ami", "ach", "owi", "om", "ie", "a", "u", "y", "i", "ę", "ą"]:
+                if word.endswith(suf) and len(word) > len(suf) + 3:
+                    return word[:-len(suf)]
+            return word
+
+        STOPWORDS = {
+            "szukam", "szukać", "szukac", "chcę", "chce", "potrzebuję", "potrzebuje",
+            "poproszę", "prosze", "proszę", "jaki", "jakie", "jaka", "jaką",
+            "do", "na", "w", "z", "i", "czy", "mi", "dla", "co", "cos", "czego",
+            "masz", "macie", "jest", "są", "sa", "możesz", "mozna"
+        }
+
+        words = re.findall(r"[a-zA-ZąćęłńóśżźĄĆĘŁŃÓŚŻŹ0-9]+", (question or "").lower())
+        words = [w for w in words if w not in STOPWORDS and len(w) >= 3]
+        words = [normalize_pl(w) for w in words]
+        words = words[:6]  # max 6 tokenów
+
+        if not words:
+            return []
+
+        where_clauses = []
+        where_params = []
+        for w in words:
+            where_clauses.append("(p.name ILIKE %s OR p.description ILIKE %s)")
+            like = f"%{w}%"
+            where_params.extend([like, like])
+
+        where_sql = " OR ".join(where_clauses)
+
+        score_parts = []
+        score_params = []
+        for w in words:
+            like = f"%{w}%"
+            score_parts.append("((p.name ILIKE %s)::int * 2 + (p.description ILIKE %s)::int)")
+            score_params.extend([like, like])
+
+        score_sql = " + ".join(score_parts)
+
+        conn = get_db_connection(self.cfg)
+        cur = conn.cursor()
+        cur.execute(f"""
+            SELECT p.id, p.name, p.description, p.link,
+                   COALESCE(string_agg(r.review_text, E'\n'), '') as reviews,
+                   ({score_sql}) as score
+            FROM products p
+            LEFT JOIN reviews r ON r.product_id = p.id
+            WHERE {where_sql}
+            GROUP BY p.id, p.name, p.description, p.link
+            ORDER BY score DESC, p.id DESC
+            LIMIT 20
+        """, where_params + score_params)
+
+        rows = cur.fetchall()
+        cur.close()
+        conn.close()
+
+        rows = [(pid, name, desc, link, reviews) for (pid, name, desc, link, reviews, score) in rows]
+        return rows
+
+    #######
+
+    def get_by_ids_with_reviews(self, ids):
+        if not ids:
+            return []
+
+
+        try:
+            ids = [int(x) for x in ids]
+        except Exception:
+            return []
+
+        conn = get_db_connection(self.cfg)
+        cur = conn.cursor()
+
+        cur.execute("""
+            SELECT p.id, p.name, p.description, p.link,
+                   COALESCE(string_agg(r.review_text, E'\n'), '') as reviews
+            FROM products p
+            LEFT JOIN reviews r ON r.product_id = p.id
+            WHERE p.id = ANY(%s::int[])
+            GROUP BY p.id, p.name, p.description, p.link
+        """, (ids,))
+
+        rows = cur.fetchall()
+        cur.close()
+        conn.close()
+
+
+        order = {pid: i for i, pid in enumerate(ids)}
+        rows.sort(key=lambda r: order.get(r[0], 10_000))
         return rows
